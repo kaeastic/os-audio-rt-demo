@@ -1,0 +1,12 @@
+# Compiled binary
+rt_audio_demo
+
+# Object files
+*.o
+
+# WAV output files
+*.wav
+
+# Misc editor/OS stuff
+*.swp
+.DS_Store
