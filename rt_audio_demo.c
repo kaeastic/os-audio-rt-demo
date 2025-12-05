@@ -64,10 +64,12 @@ static config_t g_cfg = {
     .miss_threshold_ns = DEFAULT_MISS_THRESHOLD_NS,
     .use_pi            = DEFAULT_USE_PI,
     .policy            = SCHED_OTHER, // default: normal scheduling
-    .prio_prod         = 70,
-    .prio_cons         = 60,
-    .prio_dist         = 10
+    .prio_prod         = 50,
+    .prio_cons         = 99,
+    .prio_dist         = 1
 };
+/* Diagnostic flag: enable to print scheduling/lock timing info */
+static int g_diag = 0;
 
 // ============================== DATA ===============================
 
@@ -159,9 +161,22 @@ static void* producer_thread(void *arg) {
         }
 
         // Lock buffer and write one period
+        /* Measure wait time for mutex acquisition (diagnostic) */
+        int64_t lock_wait_t0 = nsec_now();
         if (pthread_mutex_lock(&buf_mutex) != 0) {
             perror("pthread_mutex_lock");
             break;
+        }
+        int64_t lock_wait_t1 = nsec_now();
+        if (g_diag) {
+            int waited_ms = (int)((lock_wait_t1 - lock_wait_t0) / 1000000LL);
+            int pol = 0; struct sched_param spc;
+            if (pthread_getschedparam(pthread_self(), &pol, &spc) == 0) {
+                printf("[consumer] mutex acquired after %d ms wait (sched=%d prio=%d)\n",
+                       waited_ms, pol, spc.sched_priority);
+            } else {
+                printf("[consumer] mutex acquired after %d ms wait\n", waited_ms);
+            }
         }
 
         int idx = g_ring.head;
@@ -236,16 +251,69 @@ static void* consumer_thread(void *arg) {
 
 // Disturber thread: simulates a low-priority task that sometimes
 // holds the mutex, causing priority inversion if PI is off.
+static inline void busy_wait_ns(long ns)
+{
+    int64_t start = nsec_now();
+    while (nsec_now() - start < ns) {
+        // burn CPU
+        __asm__ volatile("nop");
+    }
+}
+
 static void* disturber_thread(void *arg) {
     (void)arg;
     printf("[disturber] started\n");
 
-    // Light-weight disturber for WSL: just sleep a bit in a loop,
-    // so we don't starve producer/consumer.
-    struct timespec ts = { .tv_sec = 0, .tv_nsec = 1 * 1000 * 1000 }; // 1ms
+    // while (!g_stop) {
+
+    //     // 1. Hold the mutex for long enough to cause real blocking
+    //     if (pthread_mutex_lock(&buf_mutex) == 0) {
+
+    //         // HOLD critical section too long → creates priority inversion
+    //         busy_wait_ns(2 * 1000 * 1000); // 3ms CPU burn
+
+    //         pthread_mutex_unlock(&buf_mutex);
+    //     }
+
+    //     // 2. Also do extra CPU work OUTSIDE the mutex
+    //     //    → increases scheduling pressure
+    //     for (int i = 0; i < 800000; i++) {
+    //         __asm__ volatile("nop");
+    //     }
+    // }
     while (!g_stop) {
-        nanosleep(&ts, NULL);
+
+    if (pthread_mutex_lock(&buf_mutex) == 0) {
+        int64_t hold_t0 = nsec_now();
+        if (g_diag) {
+            int pol = 0; struct sched_param spd;
+            if (pthread_getschedparam(pthread_self(), &pol, &spd) == 0) {
+                printf("[disturber] acquired mutex (sched=%d prio=%d)\n",
+                       pol, spd.sched_priority);
+            } else {
+                printf("[disturber] acquired mutex\n");
+            }
+        }
+        /* Hold the mutex briefly (1 ms) instead of 9 ms */
+        busy_wait_ns(1 * 1000 * 1000); /* 1 ms CPU burn */
+        pthread_mutex_unlock(&buf_mutex);
+        if (g_diag) {
+            int64_t hold_t1 = nsec_now();
+            int held_ms = (int)((hold_t1 - hold_t0) / 1000000LL);
+            printf("[disturber] released mutex after %d ms hold\n", held_ms);
+        }
     }
+
+    /* Reduce heavy outside-of-mutex busy work */
+    for (int i = 0; i < 200000; i++) {
+        if ((i & 0xFFF) == 0) sched_yield(); /* yield occasionally */
+        __asm__ volatile("nop");
+    }
+
+    /* Give scheduler breathing room: sleep 5 ms between disturbances */
+    struct timespec ts = {0, 5 * 1000 * 1000};
+    nanosleep(&ts, NULL);
+}
 
     printf("[disturber] exiting\n");
     return NULL;
@@ -266,7 +334,16 @@ static void set_thread_sched(pthread_t th, int policy, int prio, const char *nam
         fprintf(stderr, "       (Run with sudo or give CAP_SYS_NICE, "
                         "or leave policy=SCHED_OTHER.)\n");
     } else {
-        printf("[%s] set policy=%d prio=%d\n", name, policy, prio);
+        /* Verify actual params after the call (helpful for diagnostics) */
+        int actual_policy = 0;
+        struct sched_param sp2;
+        if (pthread_getschedparam(th, &actual_policy, &sp2) == 0) {
+            printf("[%s] requested policy=%d prio=%d -> actual policy=%d prio=%d\n",
+                   name, policy, prio, actual_policy, sp2.sched_priority);
+        } else {
+            printf("[%s] set policy=%d prio=%d (verified lookup failed)\n",
+                   name, policy, prio);
+        }
     }
 }
 
@@ -345,6 +422,10 @@ static void print_usage(const char *prog) {
     printf("  --miss_ns=N                Miss threshold in ns (default: %lld)\n",
            (long long)DEFAULT_MISS_THRESHOLD_NS);
     printf("  --out=filename.wav         Output WAV file (default: out.wav)\n");
+    printf("  --prio_prod=N              Producer RT priority (RT policies)\n");
+    printf("  --prio_cons=N              Consumer RT priority (RT policies)\n");
+    printf("  --prio_dist=N              Disturber RT priority (RT policies)\n");
+    printf("  --diag                    Enable diagnostic logging (timing/priorities)\n");
 }
 
 static const char *g_out_filename = "out.wav";
@@ -374,6 +455,14 @@ static void parse_args(int argc, char **argv) {
             g_cfg.miss_threshold_ns = atoll(argv[i] + 10);
         } else if (strncmp(argv[i], "--out=", 6) == 0) {
             g_out_filename = argv[i] + 6;
+        } else if (strncmp(argv[i], "--prio_prod=", 11) == 0) {
+            g_cfg.prio_prod = atoi(argv[i] + 11);
+        } else if (strncmp(argv[i], "--prio_cons=", 11) == 0) {
+            g_cfg.prio_cons = atoi(argv[i] + 11);
+        } else if (strncmp(argv[i], "--prio_dist=", 11) == 0) {
+            g_cfg.prio_dist = atoi(argv[i] + 11);
+        } else if (strcmp(argv[i], "--diag") == 0) {
+            g_diag = 1;
         } else if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             exit(0);

@@ -1,0 +1,172 @@
+sudo ./rt_audio_demo --policy=other --pi=0 --bufdepth=2 --run=10 --out=A_other_no_pi_buf2.wav
+=== RT Audio Demo ===
+Policy: SCHED_OTHER
+Use PI: 0
+Run seconds: 10
+Sample rate: 48000
+Frames per period: 480
+Buffer depth: 2 periods
+Miss threshold: 500000 ns
+Output WAV: A_other_no_pi_buf2.wav
+[main] NOT using priority inheritance
+[producer] started
+[consumer] started
+[disturber] started
+[producer] exiting
+[consumer] exiting
+[disturber] exiting
+=== Stats ===
+Producer misses (woke > 0.500 ms late): 27
+Output periods: 1000 (~10.00 seconds of audio)
+Wrote WAV: A_other_no_pi_buf2.wav
+Done.
+
+sudo ./rt_audio_demo --policy=other --pi=1 --bufdepth=2 --run=10 --out=B_other_pi_buf2.wav
+=== RT Audio Demo ===
+Policy: SCHED_OTHER
+Use PI: 1
+Run seconds: 10
+Sample rate: 48000
+Frames per period: 480
+Buffer depth: 2 periods
+Miss threshold: 500000 ns
+Output WAV: B_other_pi_buf2.wav
+[main] using PTHREAD_PRIO_INHERIT
+[producer] started
+[consumer] started
+[disturber] started
+[producer] exiting
+[consumer] exiting
+[disturber] exiting
+=== Stats ===
+Producer misses (woke > 0.500 ms late): 15
+Output periods: 1000 (~10.00 seconds of audio)
+Wrote WAV: B_other_pi_buf2.wav
+Done.
+
+sudo ./rt_audio_demo --policy=fifo --pi=0 --bufdepth=2 --run=10 --out=C_fifo_no_pi_buf2.wav
+=== RT Audio Demo ===
+Policy: SCHED_FIFO
+Use PI: 0
+Run seconds: 10
+Sample rate: 48000
+Frames per period: 480
+Buffer depth: 2 periods
+Miss threshold: 500000 ns
+Output WAV: C_fifo_no_pi_buf2.wav
+[main] NOT using priority inheritance
+[producer] started
+[consumer] started
+[producer] requested policy=1 prio=50 -> actual policy=1 prio=50
+[disturber] started
+[consumer] requested policy=1 prio=99 -> actual policy=1 prio=99
+[disturber] requested policy=1 prio=1 -> actual policy=1 prio=1
+[consumer] exiting
+[disturber] exiting
+[producer] exiting
+=== Stats ===
+Producer misses (woke > 0.500 ms late): 25
+Output periods: 1001 (~10.01 seconds of audio)
+Wrote WAV: C_fifo_no_pi_buf2.wav
+Done.
+
+sudo ./rt_audio_demo --policy=fifo --pi=1 --bufdepth=2 --run=10 --out=D_fifo_pi_buf2.wav
+=== RT Audio Demo ===
+Policy: SCHED_FIFO
+Use PI: 1
+Run seconds: 10
+Sample rate: 48000
+Frames per period: 480
+Buffer depth: 2 periods
+Miss threshold: 500000 ns
+Output WAV: D_fifo_pi_buf2.wav
+[main] using PTHREAD_PRIO_INHERIT
+[producer] started
+[consumer] started
+[producer] requested policy=1 prio=50 -> actual policy=1 prio=50
+[consumer] requested policy=1 prio=99 -> actual policy=1 prio=99
+[disturber] requested policy=1 prio=1 -> actual policy=1 prio=1
+[disturber] started
+[consumer] exiting
+[disturber] exiting
+[producer] exiting
+=== Stats ===
+Producer misses (woke > 0.500 ms late): 2
+Output periods: 1001 (~10.01 seconds of audio)
+Wrote WAV: D_fifo_pi_buf2.wav
+Done.
+
+sudo ./rt_audio_demo --policy=fifo --pi=1 --bufdepth=8 --run=10 --out=E_fifo_pi_buf8.wav
+=== RT Audio Demo ===
+Policy: SCHED_FIFO
+Use PI: 1
+Run seconds: 10
+Sample rate: 48000
+Frames per period: 480
+Buffer depth: 8 periods
+Miss threshold: 500000 ns
+Output WAV: E_fifo_pi_buf8.wav
+[main] using PTHREAD_PRIO_INHERIT
+[producer] started
+[producer] requested policy=1 prio=50 -> actual policy=1 prio=50
+[consumer] requested policy=1 prio=99 -> actual policy=1 prio=99
+[consumer] started
+[disturber] started
+[disturber] requested policy=1 prio=1 -> actual policy=1 prio=1
+[consumer] exiting
+[disturber] exiting
+[producer] exiting
+=== Stats ===
+Producer misses (woke > 0.500 ms late): 1
+Output periods: 1001 (~10.01 seconds of audio)
+Wrote WAV: E_fifo_pi_buf8.wav
+Done.
+
+sudo ./rt_audio_demo --policy=rr --pi=1 --bufdepth=2 --run=10 --out=F_rr_pi_buf2.wav
+=== RT Audio Demo ===
+Policy: SCHED_RR
+Use PI: 1
+Run seconds: 10
+Sample rate: 48000
+Frames per period: 480
+Buffer depth: 2 periods
+Miss threshold: 500000 ns
+Output WAV: F_rr_pi_buf2.wav
+[main] using PTHREAD_PRIO_INHERIT
+[producer] started
+[consumer] started
+[producer] requested policy=2 prio=50 -> actual policy=2 prio=50
+[consumer] requested policy=2 prio=99 -> actual policy=2 prio=99
+[disturber] started
+[disturber] requested policy=2 prio=1 -> actual policy=2 prio=1
+[consumer] exiting
+[producer] exiting
+[disturber] exiting
+=== Stats ===
+Producer misses (woke > 0.500 ms late): 9
+Output periods: 1000 (~10.00 seconds of audio)
+Wrote WAV: F_rr_pi_buf2.wav
+Done.
+
+sudo ./rt_audio_demo --policy=other --pi=0 --bufdepth=2 --run=10 --out=A_other_no_pi_buf2.wav
+=== RT Audio Demo ===
+Policy: SCHED_OTHER
+Use PI: 0
+Run seconds: 10
+Sample rate: 48000
+Frames per period: 480
+Buffer depth: 2 periods
+Miss threshold: 500000 ns
+Output WAV: A_other_no_pi_buf2.wav
+[main] NOT using priority inheritance
+[producer] started
+[consumer] started
+[disturber] started
+[producer] exiting
+[consumer] exiting
+[disturber] exiting
+=== Stats ===
+Producer misses (woke > 0.500 ms late): 27
+Output periods: 1000 (~10.00 seconds of audio)
+Wrote WAV: A_other_no_pi_buf2.wav
+Done.
